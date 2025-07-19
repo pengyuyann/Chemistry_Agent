@@ -20,7 +20,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage
 from langchain.tools import BaseTool
 
-from chemcrow.utils import is_smiles
+from ..utils import is_smiles
 
 __all__ = ["RXNPredictLocal", "RXNRetrosynthesisLocal"]
 

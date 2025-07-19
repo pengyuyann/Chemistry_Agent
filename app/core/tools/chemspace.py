@@ -13,7 +13,7 @@ import pandas as pd
 import requests
 from langchain.tools import BaseTool
 
-from chemcrow.utils import is_smiles
+from ..utils import is_smiles
 
 
 class ChemSpace:

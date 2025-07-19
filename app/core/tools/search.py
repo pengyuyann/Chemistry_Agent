@@ -18,7 +18,7 @@ from langchain.tools import BaseTool
 from langchain.embeddings.openai import OpenAIEmbeddings
 from pypdf.errors import PdfReadError
 
-from chemcrow.utils import is_multiple_smiles, split_smiles
+from ..utils import is_multiple_smiles, split_smiles
 
 
 def paper_scraper(search: str, pdir: str = "query", semantic_scholar_api_key: str = None) -> dict:

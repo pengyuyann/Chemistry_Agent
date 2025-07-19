@@ -19,7 +19,7 @@ from langchain import LLMChain, PromptTemplate
 from langchain.llms import BaseLLM
 from langchain.tools import BaseTool
 
-from chemcrow.utils import is_smiles, pubchem_query2smiles, tanimoto
+from ..utils import is_smiles, pubchem_query2smiles, tanimoto
 
 from .prompts import safety_summary_prompt, summary_each_data
 

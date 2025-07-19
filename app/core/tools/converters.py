@@ -7,9 +7,9 @@
 '''
 from langchain.tools import BaseTool
 
-from chemcrow.tools.chemspace import ChemSpace
-from chemcrow.tools.safety import ControlChemCheck
-from chemcrow.utils import (
+from ..tools.chemspace import ChemSpace
+from ..tools.safety import ControlChemCheck
+from ..utils import (
     is_multiple_smiles,
     is_smiles,
     pubchem_query2smiles,

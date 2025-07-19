@@ -18,7 +18,7 @@ from langchain.schema import HumanMessage
 from langchain.tools import BaseTool
 from rxn4chemistry import RXN4ChemistryWrapper  # type: ignore
 
-from chemcrow.utils import is_smiles
+from ..utils import is_smiles
 
 __all__ = ["RXNPredict", "RXNRetrosynthesis"]
 
