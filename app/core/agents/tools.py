@@ -28,7 +28,7 @@ def make_tools(llm: BaseLanguageModel, api_keys: dict = {}, local_rxn: bool=Fals
         [
             "python_repl",
             # "ddg-search",
-            "wikipedia",
+            # "wikipedia",  # 暂时禁用，避免网络连接问题
             # "human"
         ]
     )

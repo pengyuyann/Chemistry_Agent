@@ -9,6 +9,7 @@
 # This file is tool function code, includes check, split......
 
 import re
+import os
 
 import requests
 from rdkit import Chem, DataStructs
@@ -73,16 +74,35 @@ def pubchem_query2smiles(
 
     if url is None:
         url = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{}/{}"
-    r = requests.get(url.format(query, "property/IsomericSMILES/JSON"))
-    # convert the response to a json object
-    data = r.json()
-    # return the SMILES string
+    
     try:
-        smi = data["PropertyTable"]["Properties"][0]["IsomericSMILES"]
-    except KeyError:
-        return ("Could not find a molecule matching the text."
-                " One possible cause is that the input is incorrect, input one molecule at a time")
-    return str(Chem.CanonSmiles(largest_mol(smi)))
+        # 设置代理
+        proxies = {
+            'http': os.environ.get('http_proxy'),
+            'https': os.environ.get('https_proxy')
+        }
+        
+        # 设置超时和重试
+        r = requests.get(
+            url.format(query, "property/IsomericSMILES/JSON"),
+            proxies=proxies,
+            timeout=30
+        )
+        r.raise_for_status()
+        
+        # convert the response to a json object
+        data = r.json()
+        # return the SMILES string
+        try:
+            smi = data["PropertyTable"]["Properties"][0]["IsomericSMILES"]
+        except KeyError:
+            return ("Could not find a molecule matching the text."
+                    " One possible cause is that the input is incorrect, input one molecule at a time")
+        return str(Chem.CanonSmiles(largest_mol(smi)))
+    except requests.exceptions.RequestException as e:
+        return f"Network error: {str(e)}"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 def query2cas(query: str, url_cid: str, url_data: str):
     try:
@@ -93,10 +113,22 @@ def query2cas(query: str, url_cid: str, url_data: str):
                     "Multiple SMILES strings detected, input one molecule at a time."
                 )
             mode = "smiles"
+        
+        # 设置代理
+        proxies = {
+            'http': os.environ.get('http_proxy'),
+            'https': os.environ.get('https_proxy')
+        }
+        
         url_cid = url_cid.format(mode, query)
-        cid = requests.get(url_cid).json()["IdentifierList"]["CID"][0]
+        cid_response = requests.get(url_cid, proxies=proxies, timeout=30)
+        cid_response.raise_for_status()
+        cid = cid_response.json()["IdentifierList"]["CID"][0]
+        
         url_data = url_data.format(cid)
-        data = requests.get(url_data).json()
+        data_response = requests.get(url_data, proxies=proxies, timeout=30)
+        data_response.raise_for_status()
+        data = data_response.json()
     except (requests.exceptions.RequestException, KeyError):
         raise ValueError("Invalid molecule input, no Pubchem entry")
 
@@ -124,11 +156,20 @@ def smiles2name(smi, single_name=True):
     except Exception:
         raise ValueError("Invalid SMILES string")
     # query the PubChem database
+    # 设置代理
+    proxies = {
+        'http': os.environ.get('http_proxy'),
+        'https': os.environ.get('https_proxy')
+    }
+    
     r = requests.get(
         "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/"
         + smi
-        + "/synonyms/JSON"
+        + "/synonyms/JSON",
+        proxies=proxies,
+        timeout=30
     )
+    r.raise_for_status()
     # convert the response to a json object
     data = r.json()
     # return the SMILES string

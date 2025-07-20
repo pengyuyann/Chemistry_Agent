@@ -23,13 +23,31 @@ from ..utils import is_multiple_smiles, split_smiles
 
 def paper_scraper(search: str, pdir: str = "query", semantic_scholar_api_key: str = None) -> dict:
     try:
-        return paperscraper.search_papers(
-            search,
-            pdir=pdir,
-            semantic_scholar_api_key=semantic_scholar_api_key,
-        )
+        # 设置超时时间
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Search timeout")
+        
+        # 设置30秒超时
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(30)
+        
+        try:
+            result = paperscraper.search_papers(
+                search,
+                pdir=pdir,
+                semantic_scholar_api_key=semantic_scholar_api_key,
+            )
+            signal.alarm(0)  # 取消超时
+            return result
+        except TimeoutError:
+            signal.alarm(0)  # 取消超时
+            return {"timeout": "Search timed out after 30 seconds"}
     except KeyError:
         return {}
+    except Exception as e:
+        return {"error": f"Search failed: {str(e)}"}
 
 
 def paper_search(llm, query, semantic_scholar_api_key=None):
@@ -56,12 +74,28 @@ def scholar2result_llm(llm, query, k=5, max_sources=2, openai_api_key=None, sema
     """Useful to answer questions that require
     technical knowledge. Ask a specific question."""
     papers = paper_search(llm, query, semantic_scholar_api_key=semantic_scholar_api_key)
+    
+    # 检查是否有错误或超时
     if len(papers) == 0:
         return "Not enough papers found"
+    
+    # 检查是否有错误信息
+    for key, value in papers.items():
+        if isinstance(value, dict) and ("error" in value or "timeout" in value):
+            return f"Search failed: {value.get('error', value.get('timeout', 'Unknown error'))}"
+    # 检查是否是DeepSeek模型，如果是则使用不同的API基础URL
+    if hasattr(llm, 'model_name') and llm.model_name.startswith('deepseek-chat'):
+        embeddings = OpenAIEmbeddings(
+            openai_api_key=openai_api_key,
+            openai_api_base="https://api.deepseek.com/v1"
+        )
+    else:
+        embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+    
     docs = paperqa.Docs(
         llm=llm,
         summary_llm=llm,
-        embeddings=OpenAIEmbeddings(openai_api_key=openai_api_key),
+        embeddings=embeddings,
     )
     not_loaded = 0
     for path, data in papers.items():

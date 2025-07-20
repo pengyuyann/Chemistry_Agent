@@ -15,6 +15,7 @@
 import uuid
 from typing import Optional, Dict, Any, List
 import os
+from dotenv import load_dotenv
 
 from fastapi import APIRouter, Body, HTTPException
 from pydantic import BaseModel, Field
@@ -24,6 +25,13 @@ from app.core.memory.memory_manager import get_session_history
 # 导入 ChemAgent
 from app.core.agents import ChemAgent
 
+# 加载环境变量
+load_dotenv()
+
+# 设置代理
+os.environ["http_proxy"] = "http://127.0.0.1:7897"
+os.environ["https_proxy"] = "http://127.0.0.1:7897"
+
 router = APIRouter()
 
 
@@ -31,13 +39,13 @@ class ChemAgentRequest(BaseModel):
     input: str = Field(..., description="用户的化学问题或任务")
     conversation_id: Optional[str] = Field(None,
                                            description="对话ID，如果不提供将自动生成")
-    model: str = Field(default="gpt-4-0613",
+    model: str = Field(default=os.getenv("DEFAULT_MODEL", "deepseek-chat"),
                        description="使用的LLM模型")
-    tools_model: str = Field(default="gpt-3.5-turbo-0613",
+    tools_model: str = Field(default=os.getenv("DEFAULT_TOOLS_MODEL", "deepseek-chat"),
                              description="工具选择使用的模型")
-    temperature: float = Field(default=0.1,
+    temperature: float = Field(default=float(os.getenv("DEFAULT_TEMPERATURE", "0.1")),
                                description="模型温度参数")
-    max_iterations: int = Field(default=40,
+    max_iterations: int = Field(default=int(os.getenv("DEFAULT_MAX_ITERATIONS", "40")),
                                 description="最大迭代次数")
     streaming: bool = Field(default=False,
                             description="是否使用流式输出")
@@ -67,6 +75,7 @@ def get_chemagent_instance(config: Dict[str, Any]) -> ChemAgent:
         try:
             # 从环境变量获取 API 密钥
             api_keys = {
+                "DEEPSEEK_API_KEY": os.getenv("DEEPSEEK_API_KEY"),
                 "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
                 "SERP_API_KEY": os.getenv("SERP_API_KEY"),
                 "RXN4CHEM_API_KEY": os.getenv("RXN4CHEM_API_KEY"),
@@ -84,7 +93,7 @@ def get_chemagent_instance(config: Dict[str, Any]) -> ChemAgent:
                 temp=config["temperature"],
                 max_iterations=config["max_iterations"],
                 streaming=config["streaming"],
-                openai_api_key=api_keys.get("OPENAI_API_KEY"),
+                openai_api_key=api_keys.get("DEEPSEEK_API_KEY"),  # 使用DeepSeek API密钥
                 api_keys=api_keys,
                 local_rxn=config["local_rxn"],
             )

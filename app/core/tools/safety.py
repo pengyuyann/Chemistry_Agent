@@ -236,27 +236,59 @@ class SimilarControlChemCheck(BaseTool):
         """Checks max similarity between compound and controlled chemicals.
         Input SMILES string."""
 
-        data_path = pkg_resources.resource_filename("chemcrow", "data/chem_wep_smi.csv")
-        cw_df = pd.read_csv(data_path)
-
         try:
             if not is_smiles(smiles):
                 return "Please input a valid SMILES string."
 
-            max_sim = cw_df["smiles"].apply(lambda x: self.tanimoto(smiles, x)).max()
-            if max_sim > 0.35:
-                return (
-                    f"{smiles} has a high similarity "
-                    f"({max_sim:.4}) to a known controlled chemical."
-                )
-            else:
-                return (
-                    f"{smiles} has a low similarity "
-                    f"({max_sim:.4}) to a known controlled chemical. "
-                    "This is substance is safe, you may proceed with the task."
-                )
-        except:
-            return "Tool error."
+            # 使用本地数据文件
+            import os
+            data_path = os.path.join(os.path.dirname(__file__), "..", "..", "configs", "data", "data", "chem_wep_smi.csv")
+            
+            if not os.path.exists(data_path):
+                return "Error: Controlled chemicals data file not found."
+            
+            import pandas as pd
+            cw_df = pd.read_csv(data_path)
+
+            # 检查是否直接匹配
+            if smiles in cw_df["smiles"].values:
+                return f"{smiles} is a known controlled chemical."
+            
+            # 计算相似性（简化版本）
+            try:
+                from rdkit import Chem
+                from rdkit import DataStructs
+                
+                mol1 = Chem.MolFromSmiles(smiles)
+                if mol1 is None:
+                    return "Invalid SMILES string."
+                
+                max_sim = 0.0
+                for _, row in cw_df.iterrows():
+                    mol2 = Chem.MolFromSmiles(row["smiles"])
+                    if mol2 is not None:
+                        sim = DataStructs.TanimotoSimilarity(
+                            Chem.RDKFingerprint(mol1),
+                            Chem.RDKFingerprint(mol2)
+                        )
+                        max_sim = max(max_sim, sim)
+                
+                if max_sim > 0.35:
+                    return f"{smiles} has a high similarity ({max_sim:.4}) to a known controlled chemical."
+                else:
+                    return f"{smiles} has a low similarity ({max_sim:.4}) to known controlled chemicals. This substance appears safe."
+                    
+            except ImportError:
+                # 如果没有RDKit，使用简单的字符串比较
+                max_sim = 0.0
+                for _, row in cw_df.iterrows():
+                    if smiles == row["smiles"]:
+                        return f"{smiles} is a known controlled chemical."
+                
+                return f"{smiles} does not appear in the controlled chemicals list."
+
+        except Exception as e:
+            return f"Tool error: {str(e)}"
 
     def tanimoto(self, s1, s2):
         sim = tanimoto(s1, s2)
@@ -276,10 +308,19 @@ class ControlChemCheck(BaseTool):
 
     def _run(self, query: str) -> str:
         """Checks if compound is a controlled chemical. Input CAS number."""
-        data_path = pkg_resources.resource_filename("chemcrow", "data/chem_wep_smi.csv")
-        cw_df = pd.read_csv(data_path)
         try:
+            # 使用本地数据文件
+            import os
+            data_path = os.path.join(os.path.dirname(__file__), "..", "..", "configs", "data", "data", "chem_wep.csv")
+            
+            if not os.path.exists(data_path):
+                return "Error: Controlled chemicals data file not found."
+            
+            import pandas as pd
+            cw_df = pd.read_csv(data_path)
+            
             if is_smiles(query):
+                # 如果是SMILES，直接检查
                 query_esc = re.escape(query)
                 found = (
                     cw_df["smiles"]
@@ -288,25 +329,26 @@ class ControlChemCheck(BaseTool):
                     .any()
                 )
             else:
+                # 如果是CAS号，检查CAS列
                 found = (
-                    cw_df["cas"]
+                    cw_df["CAS No."]
                     .astype(str)
-                    .str.contains(f"^\({query}\)$", regex=True)
+                    .str.contains(f"^{query}$", regex=True)
                     .any()
                 )
+            
             if found:
-                return (
-                    f"The molecule {query} appears in a list of "
-                    "controlled chemicals."
-                )
+                return f"The molecule {query} appears in a list of controlled chemicals."
             else:
-                # Get smiles of CAS number
-                try:
-                    smi = pubchem_query2smiles(query)
-                except ValueError as e:
-                    return str(e)
-                # Check similarity to known controlled chemicals
-                return self.similar_control_chem_check._run(smi)
+                # 如果没有找到，尝试通过SMILES进行相似性检查
+                if not is_smiles(query):
+                    try:
+                        smi = pubchem_query2smiles(query)
+                        return self.similar_control_chem_check._run(smi)
+                    except ValueError as e:
+                        return f"Error: {e}"
+                else:
+                    return f"The molecule {query} does not appear to be a controlled chemical."
 
         except Exception as e:
             return f"Error: {e}"
