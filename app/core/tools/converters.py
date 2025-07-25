@@ -48,7 +48,7 @@ class Query2CAS(BaseTool):
                 return str(e)
             if smiles is None:
                 try:
-                    smiles = pubchem_query2smiles(cas, None)
+                    smiles = pubchem_query2smiles(cas)
                 except ValueError as e:
                     return str(e)
             # check if mol is controlled
@@ -61,8 +61,7 @@ class Query2CAS(BaseTool):
 
     async def _arun(self, query: str) -> str:
         """Use the tool asynchronously."""
-        raise NotImplementedError()
-
+        return self._run(query)
 
 class Query2SMILES(BaseTool):
     name = "Name2SMILES"
@@ -74,15 +73,14 @@ class Query2SMILES(BaseTool):
     def __init__(self, chemspace_api_key: str = None):
         super().__init__()
         self.chemspace_api_key = chemspace_api_key
-        self.url = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{}/{}"
+        # 修复：正确设置 PubChem 查询 URL
+        self.url = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{}/property/IsomericSMILES/JSON"
 
     def _run(self, query: str) -> str:
-        """This function queries the given molecule name and returns a SMILES string from the record"""
-        """Useful to get the SMILES string of one molecule by searching the name of a molecule. Only query with one specific name."""
         if is_smiles(query) and is_multiple_smiles(query):
             return "Multiple SMILES strings detected, input one molecule at a time."
         try:
-            smi = pubchem_query2smiles(query, self.url)
+            smi = pubchem_query2smiles(query)
         except Exception as e:
             if self.chemspace_api_key:
                 try:
@@ -94,16 +92,13 @@ class Query2SMILES(BaseTool):
             else:
                 return str(e)
 
-        # check if mol is controlled
         msg = "Note: " + self.ControlChemCheck._run(smi)
         if "high similarity" in msg or "appears" in msg:
             return f"CAS number {smi}found, but " + msg
         return smi
 
     async def _arun(self, query: str) -> str:
-        """Use the tool asynchronously."""
-        raise NotImplementedError()
-
+        return self._run(query)
 
 class SMILES2Name(BaseTool):
     name = "SMILES2Name"
@@ -133,5 +128,4 @@ class SMILES2Name(BaseTool):
 
     async def _arun(self, query: str) -> str:
         """Use the tool asynchronously."""
-        raise NotImplementedError()
-
+        return self._run(query)

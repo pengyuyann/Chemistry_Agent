@@ -125,9 +125,9 @@ class RXNPredict(RXN4Chem):
         else:
             raise KeyError
 
-    async def _arun(self, cas_number):
+    async def _arun(self, smiles: str):
         """Async run reaction prediction."""
-        raise NotImplementedError("Async not implemented.")
+        return self._run(smiles)
 
 
 class RXNRetrosynthesis(RXN4Chem):
@@ -157,9 +157,9 @@ class RXNRetrosynthesis(RXN4Chem):
         procedure = self.get_action_sequence(paths[0])
         return procedure
 
-    async def _arun(self, cas_number):
+    async def _arun(self, target: str):
         """Async run retrosynthesis prediction."""
-        raise NotImplementedError("Async not implemented.")
+        return self._run(target)
 
     @RXN4Chem.retry(10, KeyError)
     def predict_retrosynthesis(self, target: str) -> str:

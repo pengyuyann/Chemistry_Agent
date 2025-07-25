@@ -43,6 +43,9 @@ class RXNPredictLocal(BaseTool):
         product = self.predict_reaction(reactants)
         return product
 
+    async def _arun(self, reactants: str) -> str:
+        return self._run(reactants)
+
     def predict_reaction(self, reactants: str) -> str:
         """Make api request."""
         try:
@@ -75,6 +78,9 @@ class RXNRetrosynthesisLocal(BaseTool):
         paths = self.retrosynthesis(reactants)
         procedure = self.get_action_sequence(paths[0])
         return procedure
+
+    async def _arun(self, reactants: str) -> str:
+        return self._run(reactants)
 
     def retrosynthesis(self, reactants: str) -> str:
         """Make api request."""

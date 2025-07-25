@@ -197,7 +197,7 @@ class SafetySummary(BaseTool):
         return self.llm_chain.run(" ".join(data))
 
     async def _arun(self, cas_number):
-        raise NotImplementedError("Async not implemented.")
+        return self._run(cas_number)
 
 
 class ExplosiveCheck(BaseTool):
@@ -225,7 +225,7 @@ class ExplosiveCheck(BaseTool):
             return "Molecule is not known to be explosive"
 
     async def _arun(self, cas_number):
-        raise NotImplementedError("Async not implemented.")
+        return self._run(cas_number)
 
 
 class SimilarControlChemCheck(BaseTool):
@@ -298,7 +298,7 @@ class SimilarControlChemCheck(BaseTool):
 
     async def _arun(self, query: str) -> str:
         """Use the tool asynchronously."""
-        raise NotImplementedError()
+        return self._run(query)
 
 
 class ControlChemCheck(BaseTool):
@@ -355,4 +355,4 @@ class ControlChemCheck(BaseTool):
 
     async def _arun(self, query: str) -> str:
         """Use the tool asynchronously."""
-        raise NotImplementedError()
+        return self._run(query)

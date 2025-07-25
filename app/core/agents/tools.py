@@ -11,9 +11,10 @@ from langchain import agents
 from langchain.base_language import BaseLanguageModel
 
 from ..tools import *
+from ..tools.reranker_tool import make_reranker_tools
 
 
-def make_tools(llm: BaseLanguageModel, api_keys: dict = {}, local_rxn: bool=False, verbose=True):
+def make_tools(llm: BaseLanguageModel, api_keys: dict = {}, local_rxn: bool=False, verbose=True, user_id: int = None, conversation_id: str = None):
     serp_api_key = api_keys.get("SERP_API_KEY") or os.getenv("SERP_API_KEY")
     rxn4chem_api_key = api_keys.get("RXN4CHEM_API_KEY") or os.getenv("RXN4CHEM_API_KEY")
     openai_api_key = api_keys.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
@@ -65,5 +66,10 @@ def make_tools(llm: BaseLanguageModel, api_keys: dict = {}, local_rxn: bool=Fals
             RXNPredictLocal(),
             RXNRetrosynthesisLocal()
         ]
+    
+    # 添加重排序工具（如果提供了用户ID）
+    if user_id:
+        reranker_tools = make_reranker_tools(user_id, conversation_id)
+        all_tools += reranker_tools
 
     return all_tools

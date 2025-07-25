@@ -62,47 +62,52 @@ def tanimoto(s1, s2):
     except (TypeError, ValueError, AttributeError):
         return "Error: Not a valid SMILES string"
 
-def pubchem_query2smiles(
-        query:str,
-        url:str = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{}/{}",
-) ->str:
-    if is_smiles(query):
-        if not is_multiple_smiles(query):
-            return query
-        else:
-            raise ValueError("Multiple SMILES strings detected, pls input one molecule at a time")
+import requests                      # HTTP 请求库
+from urllib.parse import quote       # 用于 URL 编码
 
-    if url is None:
-        url = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{}/{}"
-    
+def pubchem_query2smiles(query: str) -> str:
+    """
+    通过 PubChem 名称查询 SMILES（多级回退：Iso → Canonical → 普通）
+    """
+    # ① 将化学名进行 URL 编码，避免空格、中文导致 404
+    query = query.strip()
+    encoded = quote(query)
+
+
+    # ② 一次性向 PubChem 请求三个字段，减少网络往返
+    url = (
+        "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/"
+        f"{encoded}/property/IsomericSMILES,CanonicalSMILES,SMILES/JSON"
+    )
+    print(f"🔍 请求：{url}")
+    # 设置代理
+    proxies = {
+        'http': os.environ.get('http_proxy'),
+        'https': os.environ.get('https_proxy')
+    }
+
+    # ③ 发送 GET 请求，捕获网络异常
     try:
-        # 设置代理
-        proxies = {
-            'http': os.environ.get('http_proxy'),
-            'https': os.environ.get('https_proxy')
-        }
-        
-        # 设置超时和重试
-        r = requests.get(
-            url.format(query, "property/IsomericSMILES/JSON"),
-            proxies=proxies,
-            timeout=30
-        )
-        r.raise_for_status()
-        
-        # convert the response to a json object
-        data = r.json()
-        # return the SMILES string
-        try:
-            smi = data["PropertyTable"]["Properties"][0]["IsomericSMILES"]
-        except KeyError:
-            return ("Could not find a molecule matching the text."
-                    " One possible cause is that the input is incorrect, input one molecule at a time")
-        return str(Chem.CanonSmiles(largest_mol(smi)))
-    except requests.exceptions.RequestException as e:
-        return f"Network error: {str(e)}"
+        res = requests.get(url, proxies= proxies,timeout=10)  # 10 秒超时
+        res.raise_for_status()               # HTTP 非 200 抛异常
+        data = res.json()                    # 解析 JSON
     except Exception as e:
-        return f"Error: {str(e)}"
+        raise ValueError(f"网络错误或 PubChem 不可达：{e}")
+
+    # ④ 提取属性字典
+    try:
+        props = data["PropertyTable"]["Properties"][0]
+    except (KeyError, IndexError):
+        raise ValueError("PubChem 返回结构异常，未找到 Properties 节点")
+
+    # ⑤ 按优先级依次返回字段
+    for field in ("IsomericSMILES", "CanonicalSMILES", "SMILES"):
+        if field in props and props[field]:
+            print(props[field])
+            return props[field]
+
+    # ⑥ 如果三个字段都不存在，抛出明确错误
+    raise ValueError("未能获取到任何 SMILES 字段，请检查化学名是否正确")
 
 def query2cas(query: str, url_cid: str, url_data: str):
     try:
@@ -113,6 +118,55 @@ def query2cas(query: str, url_cid: str, url_data: str):
                     "Multiple SMILES strings detected, input one molecule at a time."
                 )
             mode = "smiles"
+        
+        # 常见化学品名称映射
+        common_chemicals = {
+            # 中文名称映射
+            "阿司匹林": "aspirin",
+            "乙酰水杨酸": "aspirin", 
+            "苯": "benzene",
+            "乙醇": "ethanol",
+            "甲醇": "methanol",
+            "丙酮": "acetone",
+            "乙酸": "acetic acid",
+            "硫酸": "sulfuric acid",
+            "盐酸": "hydrochloric acid",
+            "氢氧化钠": "sodium hydroxide",
+            "氯化钠": "sodium chloride",
+            "葡萄糖": "glucose",
+            "蔗糖": "sucrose",
+            "咖啡因": "caffeine",
+            "尼古丁": "nicotine",
+            "吗啡": "morphine",
+            "可卡因": "cocaine",
+            "海洛因": "heroin",
+            "大麻": "cannabis",
+            "冰毒": "methamphetamine",
+            # 英文名称映射
+            "aspirin": "aspirin",
+            "benzene": "benzene",
+            "ethanol": "ethanol",
+            "methanol": "methanol",
+            "acetone": "acetone",
+            "acetic acid": "acetic acid",
+            "sulfuric acid": "sulfuric acid",
+            "hydrochloric acid": "hydrochloric acid",
+            "sodium hydroxide": "sodium hydroxide",
+            "sodium chloride": "sodium chloride",
+            "glucose": "glucose",
+            "sucrose": "sucrose",
+            "caffeine": "caffeine",
+            "nicotine": "nicotine",
+            "morphine": "morphine",
+            "cocaine": "cocaine",
+            "heroin": "heroin",
+            "cannabis": "cannabis",
+            "methamphetamine": "methamphetamine",
+        }
+        
+        # 检查是否有映射
+        if query in common_chemicals:
+            query = common_chemicals[query]
         
         # 设置代理
         proxies = {
@@ -139,10 +193,13 @@ def query2cas(query: str, url_cid: str, url_data: str):
                     if subsection.get("TOCHeading") == "Other Identifiers":
                         for subsubsection in subsection["Section"]:
                             if subsubsection.get("TOCHeading") == "CAS":
-                                return subsubsection["Information"][0]["Value"][
-                                    "StringWithMarkup"
-                                ][0]["String"]
-    except KeyError:
+                                try:
+                                    return subsubsection["Information"][0]["Value"][
+                                        "StringWithMarkup"
+                                    ][0]["String"]
+                                except (KeyError, IndexError):
+                                    continue
+    except (KeyError, IndexError):
         raise ValueError("Invalid molecule input, no Pubchem entry")
 
     raise ValueError("CAS number not found")
@@ -177,12 +234,12 @@ def smiles2name(smi, single_name=True):
         if single_name:
             index = 0
             names = data["InformationList"]["Information"][0]["Synonym"]
-            while is_cas(name := names[index]):
+            while index < len(names) and is_cas(name := names[index]):
                 index += 1
-                if index == len(names):
+                if index >= len(names):
                     raise ValueError("No name found")
         else:
             name = data["InformationList"]["Information"][0]["Synonym"]
-    except KeyError:
+    except (KeyError, IndexError):
         raise ValueError("Unknown Molecule")
     return name

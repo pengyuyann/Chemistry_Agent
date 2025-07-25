@@ -66,7 +66,7 @@ class SMILES2Weight(BaseTool):
 
     async def _arun(self, smiles: str) -> str:
         """Use the tool asynchronously."""
-        raise NotImplementedError()
+        return self._run(smiles)
 
 
 class FuncGroups(BaseTool):
@@ -152,5 +152,5 @@ class FuncGroups(BaseTool):
 
     async def _arun(self, smiles: str) -> str:
         """Use the tool asynchronously."""
-        raise NotImplementedError()
+        return self._run(smiles)
 

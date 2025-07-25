@@ -23,6 +23,7 @@ os.environ["https_proxy"] = "http://127.0.0.1:7897"
 
 # 导入路由
 from app.api.endpoints import chemagent_chat
+from app.api.endpoints import auth, admin
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -48,6 +49,16 @@ app.include_router(
     chemagent_chat.router, 
     prefix="/api/chemagent", 
     tags=["Chemistry Agent"]
+)
+app.include_router(
+    auth.router,
+    prefix="/api/auth",
+    tags=["Auth"]
+)
+app.include_router(
+    admin.router,
+    prefix="/api/admin",
+    tags=["Admin"]
 )
 
 @app.get("/", tags=["Root"])
@@ -91,7 +102,8 @@ def get_api_info():
             "化学结构转换"
         ],
         "supported_models": [
-            "deepseek-chat"
+            "deepseek-chat",
+            "deepseek-reasoner",
             "gpt-4-0613",
             "gpt-3.5-turbo-0613"
         ],
@@ -135,21 +147,21 @@ if __name__ == "__main__":
     # 从环境变量获取配置
     port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
-    reload = os.getenv("RELOAD", "True").lower() == "true"
+    #reload = os.getenv("RELOAD", "True").lower() == "true"
     log_level = os.getenv("LOG_LEVEL", "info")
-    
+
     print(f"🚀 启动 Chemistry Agent API 服务...")
     print(f"📍 服务地址: http://{host}:{port}")
     print(f"📚 API文档: http://{host}:{port}/docs")
     print(f"🔍 健康检查: http://{host}:{port}/health")
-    print(f"🔄 热重载: {'启用' if reload else '禁用'}")
+    print(f"🔄 热重载: {'启用' if True else '禁用'}")
     print(f"📝 日志级别: {log_level}")
-    
+
     # 启动服务器
     uvicorn.run(
-        app, 
-        host=host, 
+        "app.api.main:app",
+        host=host,
         port=port,
-        reload=reload,
-        log_level=log_level
+        reload=True,
+        log_level="info"
     )

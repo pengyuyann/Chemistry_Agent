@@ -22,13 +22,38 @@ class ChemSpace:
         self._renew_token()  # Create token
 
     def _renew_token(self):
-        self.chemspace_token = requests.get(
-            url="https://api.chem-space.com/auth/token",
-            headers={
-                "Accept": "application/json",
-                "Authorization": f"Bearer {self.chemspace_api_key}",
-            },
-        ).json()["access_token"]
+        try:
+            # 设置代理
+            proxies = {
+                'http': os.environ.get('http_proxy'),
+                'https': os.environ.get('https_proxy')
+            }
+            
+            response = requests.get(
+                url="https://api.chem-space.com/auth/token",
+                headers={
+                    "Accept": "application/json",
+                    "Authorization": f"Bearer {self.chemspace_api_key}",
+                },
+                proxies=proxies,
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            if "access_token" in data:
+                self.chemspace_token = data["access_token"]
+            else:
+                # 如果没有access_token，可能是API密钥本身就是token
+                self.chemspace_token = self.chemspace_api_key
+                
+        except requests.exceptions.RequestException as e:
+            # 如果认证失败，使用API密钥作为token
+            print(f"Warning: ChemSpace authentication failed: {e}")
+            self.chemspace_token = self.chemspace_api_key
+        except Exception as e:
+            print(f"Warning: ChemSpace token renewal failed: {e}")
+            self.chemspace_token = self.chemspace_api_key
 
     def _make_api_request(
         self,
@@ -49,31 +74,54 @@ class ChemSpace:
         """
 
         def _do_request():
-            data = requests.request(
-                "POST",
-                url=f"https://api.chem-space.com/v3/search/{request_type}?count={count}&page=1&categories={categories}",
-                headers={
-                    "Accept": "application/json; version=3.1",
-                    "Authorization": f"Bearer {self.chemspace_token}",
-                },
-                data={"SMILES": f"{query}"},
-            ).json()
-            return data
+            # 设置代理
+            proxies = {
+                'http': os.environ.get('http_proxy'),
+                'https': os.environ.get('https_proxy')
+            }
+            
+            try:
+                response = requests.request(
+                    "POST",
+                    url=f"https://api.chem-space.com/v3/search/{request_type}?count={count}&page=1&categories={categories}",
+                    headers={
+                        "Accept": "application/json; version=3.1",
+                        "Authorization": f"Bearer {self.chemspace_token}",
+                    },
+                    data={"SMILES": f"{query}"},
+                    proxies=proxies,
+                    timeout=30
+                )
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.RequestException as e:
+                return {"error": f"Request failed: {str(e)}"}
+            except Exception as e:
+                return {"error": f"Unexpected error: {str(e)}"}
 
         data = _do_request()
+
+        # 检查是否有错误
+        if "error" in data:
+            return data
 
         # renew token if token is invalid
         if "message" in data.keys():
             if data["message"] == "Your request was made with invalid credentials.":
                 self._renew_token()
+                data = _do_request()
 
-        data = _do_request()
         return data
 
     def _convert_single(self, query, search_type: str):
         """Do query for a single molecule"""
         data = self._make_api_request(query, "exact", 1, "CSCS,CSMB,CSSB")
-        if data["count"] > 0:
+        
+        # 检查是否有错误
+        if "error" in data:
+            return f"Error: {data['error']}"
+        
+        if "count" in data and data["count"] > 0:
             return data["items"][0][search_type]
         else:
             return "No data was found for this compound."
@@ -133,6 +181,10 @@ class ChemSpace:
             categories = "CSSS,CSMS"
 
         data = self._make_api_request(smiles, request_type, count, categories)
+
+        # 检查是否有错误
+        if "error" in data:
+            return f"Error: {data['error']}"
 
         try:
             if data["count"] == 0:
@@ -199,5 +251,4 @@ class GetMoleculePrice(BaseTool):
             return str(e)
 
     async def _arun(self, query: str) -> str:
-        """Use the tool asynchronously."""
-        raise NotImplementedError()
+        return self._run(query)

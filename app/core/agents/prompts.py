@@ -49,7 +49,7 @@ Question: {input}
 SUFFIX = """
 Thought: {agent_scratchpad}
 """
-FINAL_ANSWER_ACTION = "Final Answer:"
+FINAL_ANSWER_ACTION = """Final Answer:"""
 
 
 REPHRASE_TEMPLATE = """In this exercise you will assume the role of a scientific assistant. Your task is to answer the provided question as best as you can, based on the provided solution draft.
