@@ -2,7 +2,7 @@ import ast
 import os
 import pytest
 from dotenv import load_dotenv
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 
 # 设置代理
 os.environ["http_proxy"] = "http://127.0.0.1:7897"

@@ -17,8 +17,8 @@ import requests
 
 import json
 from langchain.chat_models import ChatOpenAI
-from langchain.schema import HumanMessage
-from langchain.tools import BaseTool
+from langchain_core.messages import HumanMessage
+from langchain_core.tools import BaseTool
 
 from ..utils import is_smiles
 
@@ -28,8 +28,8 @@ __all__ = ["RXNPredictLocal", "RXNRetrosynthesisLocal"]
 class RXNPredictLocal(BaseTool):
     """Predict reaction."""
 
-    name = "ReactionPredict"
-    description = (
+    name: str = "ReactionPredict"
+    description: str = (
         "Predict the outcome of a chemical reaction. "
         "Takes as input the SMILES of the reactants separated by a dot '.', "
         "returns SMILES of the products."
@@ -62,8 +62,8 @@ class RXNPredictLocal(BaseTool):
 class RXNRetrosynthesisLocal(BaseTool):
     """Predict retrosynthesis."""
 
-    name = "ReactionRetrosynthesis"
-    description = (
+    name: str = "ReactionRetrosynthesis"
+    description: str = (
         "Obtain the synthetic route to a chemical compound. "
         "Takes as input the SMILES of the product, returns recipe."
     )

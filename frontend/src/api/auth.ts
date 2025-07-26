@@ -1,35 +1,91 @@
-import axios from 'axios';
-import { getToken } from '../utils/token';
+import { api } from './api';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/auth';
+export interface UserProfile {
+  user_id: number;
+  username: string;
+  email: string | null;
+  is_admin: boolean;
+  is_active: boolean;
+  api_calls_count: number;
+  api_calls_today: number;
+  last_api_call: string | null;
+  preferred_model: string;
+  max_conversations: number;
+  max_messages_per_conversation: number;
+  last_login: string | null;
+  created_at: string;
+  updated_at: string;
+  conversation_count: number;
+  message_count: number;
+}
+
+export interface ApiUsage {
+  api_calls_count: number;
+  api_calls_today: number;
+  last_api_call: string | null;
+  usage_reset_date: string | null;
+}
+
+export interface UserPreferences {
+  preferred_model: string;
+  max_conversations: number;
+  max_messages_per_conversation: number;
+}
 
 export async function login(username: string, password: string) {
-  const form = new FormData();
-  form.append('username', username);
-  form.append('password', password);
-  const res = await fetch(`${API_BASE}/login`, {
-    method: 'POST',
-    body: form,
+  const formData = new FormData();
+  formData.append('username', username);
+  formData.append('password', password);
+  
+  const response = await api.post('/auth/login', formData, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
   });
-  if (!res.ok) throw new Error('登录失败');
-  return await res.json();
+  
+  return response.data;
 }
 
-export async function register(username: string, password: string) {
-  const res = await fetch(`${API_BASE}/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
+export async function register(username: string, password: string, email?: string) {
+  const response = await api.post('/auth/register', {
+    username,
+    password,
+    email,
   });
-  if (!res.ok) throw new Error('注册失败');
-  return await res.json();
+  
+  return response.data;
 }
 
-export async function getMe() {
-  const token = getToken();
-  const res = await fetch(`${API_BASE}/me`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error('获取用户信息失败');
-  return await res.json();
-} 
+export async function getCurrentUser() {
+  const response = await api.get('/auth/me');
+  return response.data;
+}
+
+// 获取用户个人信息
+export const getUserProfile = async (): Promise<UserProfile> => {
+  const response = await api.get('/auth/profile');
+  return response.data;
+};
+
+// 更新用户邮箱
+export const updateUserEmail = async (email: string): Promise<{ message: string; email: string }> => {
+  const response = await api.put('/auth/profile/email', { email });
+  return response.data;
+};
+
+// 更新用户偏好设置
+export const updateUserPreferences = async (preferences: Partial<UserPreferences>): Promise<{
+  message: string;
+  preferred_model: string;
+  max_conversations: number;
+  max_messages_per_conversation: number;
+}> => {
+  const response = await api.put('/auth/profile/preferences', preferences);
+  return response.data;
+};
+
+// 获取API使用情况
+export const getApiUsage = async (): Promise<ApiUsage> => {
+  const response = await api.get('/auth/usage');
+  return response.data;
+}; 

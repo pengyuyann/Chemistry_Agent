@@ -1,6 +1,6 @@
 import pytest
 from dotenv import load_dotenv
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 
 # 设置代理
 import os

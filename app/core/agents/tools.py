@@ -11,7 +11,6 @@ from langchain import agents
 from langchain.base_language import BaseLanguageModel
 
 from ..tools import *
-from ..tools.reranker_tool import make_reranker_tools
 
 
 def make_tools(llm: BaseLanguageModel, api_keys: dict = {}, local_rxn: bool=False, verbose=True, user_id: int = None, conversation_id: str = None):
@@ -25,14 +24,19 @@ def make_tools(llm: BaseLanguageModel, api_keys: dict = {}, local_rxn: bool=Fals
         "SEMANTIC_SCHOLAR_API_KEY"
     )
 
-    all_tools = agents.load_tools(
-        [
-            "python_repl",
-            # "ddg-search",
-            # "wikipedia",  # 暂时禁用，避免网络连接问题
-            # "human"
-        ]
-    )
+    # 在新版本的LangChain中，python_repl工具已经移动到了langchain_community.tools
+    try:
+        from langchain_community.tools import PythonREPLTool
+        all_tools = [PythonREPLTool()]
+    except ImportError:
+        # 如果导入失败，尝试使用旧的方式
+        try:
+            all_tools = agents.load_tools(["python_repl"])
+        except ValueError:
+            # 如果都失败了，使用空的工具列表
+            all_tools = []
+    
+    # 维基百科功能已集成到WebSearch工具中
 
     all_tools += [
         Query2SMILES(chemspace_api_key),
@@ -67,9 +71,4 @@ def make_tools(llm: BaseLanguageModel, api_keys: dict = {}, local_rxn: bool=Fals
             RXNRetrosynthesisLocal()
         ]
     
-    # 添加重排序工具（如果提供了用户ID）
-    if user_id:
-        reranker_tools = make_reranker_tools(user_id, conversation_id)
-        all_tools += reranker_tools
-
     return all_tools

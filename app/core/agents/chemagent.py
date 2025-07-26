@@ -12,13 +12,20 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
-from langchain import PromptTemplate, chains
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-from langchain.callbacks.base import BaseCallbackHandler
+from langchain_core.prompts import PromptTemplate
+from langchain import chains
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 
 from langchain.agents import initialize_agent, AgentType
 from langchain.agents import AgentExecutor
-from pydantic import ValidationError
+try:
+    from pydantic import ValidationError
+except ImportError:
+    try:
+        from pydantic.v1 import ValidationError
+    except ImportError:
+        ValidationError = ValueError
 
 from .prompts import FORMAT_INSTRUCTIONS, QUESTION_PROMPT, REPHRASE_TEMPLATE, SUFFIX
 from .tools import make_tools
@@ -50,49 +57,43 @@ class SimpleStreamingCallbackHandler(BaseCallbackHandler):
         pass
 
 def _make_llm(model, temp, api_key, streaming: bool = False, callbacks=None):
-    """根据模型类型初始化 LLM"""
-
-    # 设置本地代理（如需要）- 只在需要时设置
-    proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
-    if proxy:
-        os.environ["http_proxy"] = proxy
-        os.environ["https_proxy"] = proxy
-
-    if callbacks is None:
-        callbacks = []
-
-    if model.startswith("gpt-3.5-turbo") or model.startswith("gpt-4"):
-        from langchain.chat_models import ChatOpenAI
-        return ChatOpenAI(
-            temperature=temp,
-            model_name=model,
-            request_timeout=1000,
-            streaming=streaming,
-            callbacks=callbacks,
-            openai_api_key=api_key,
-        )
-    elif model.startswith("text-"):
-        from langchain.llms import OpenAI
-        return OpenAI(
-            temperature=temp,
-            model_name=model,
-            streaming=streaming,
-            callbacks=callbacks,
-            openai_api_key=api_key,
-        )
-    elif model.startswith("deepseek-chat") or model.startswith("deepseek-reasoner"):
-        from langchain.chat_models import ChatOpenAI
-        return ChatOpenAI(
-            temperature=temp,
-            model_name=model,
-            request_timeout=1000,
-            streaming=streaming,
-            callbacks=callbacks,
-            openai_api_key=api_key,
-            openai_api_base="https://api.deepseek.com/v1",
-        )
-    else:
-        raise ValueError(f"Invalid model name: {model}")
+    """创建LLM实例"""
+    try:
+        if model.startswith("gpt-3.5-turbo") or model.startswith("gpt-4"):
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
+                temperature=temp,
+                model_name=model,
+                request_timeout=1000,
+                streaming=streaming,
+                callbacks=callbacks,
+                openai_api_key=api_key,
+            )
+        elif model.startswith("text-"):
+            from langchain_openai import OpenAI
+            return OpenAI(
+                temperature=temp,
+                model_name=model,
+                streaming=streaming,
+                callbacks=callbacks,
+                openai_api_key=api_key,
+            )
+        elif model.startswith("deepseek-chat") or model.startswith("deepseek-reasoner"):
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
+                temperature=temp,
+                model_name=model,
+                request_timeout=1000,
+                streaming=streaming,
+                callbacks=callbacks,
+                openai_api_key=api_key,
+                openai_api_base="https://api.deepseek.com/v1",
+            )
+        else:
+            raise ValueError(f"Invalid model name: {model}")
+    except Exception as e:
+        # 捕获所有可能的异常，包括ValidationError和其他配置错误
+        raise ValueError(f"Failed to create LLM instance for model {model}: {str(e)}")
 
 class ChemAgent:
     def __init__(
@@ -122,8 +123,8 @@ class ChemAgent:
 
         try:
             self.llm = _make_llm(model, temp, openai_api_key, streaming, callbacks)
-        except ValidationError:
-            raise ValueError("Invalid OpenAI API keys")
+        except Exception as e:
+            raise ValueError(f"Failed to initialize LLM: {str(e)}")
 
         if tools is None:
             api_keys["OPENAI_API_KEY"] = openai_api_key
@@ -207,25 +208,34 @@ class ChemAgent:
             # 处理每个推理步骤
             for i, step in enumerate(intermediate_steps, 1):
                 action, observation = step
+                
+                tool_name = getattr(action, "tool", "")
+                tool_input = getattr(action, "tool_input", "")
+                thought = getattr(action, "log", "")
 
-                # 发送思考步骤
-                step_data = {
-                    "type": "thinking",
-                    "step": {
-                        "thought": getattr(action, "log", ""),
-                        "action": getattr(action, "tool", ""),
-                        "action_input": getattr(action, "tool_input", "")
-                    }
-                }
-                yield json.dumps(step_data, ensure_ascii=False)
+                # 发送工具开始信号
+                yield json.dumps({
+                    "type": "tool_start",
+                    "tool": tool_name,
+                    "input": tool_input
+                }, ensure_ascii=False)
                 await asyncio.sleep(0.1)
 
-                # 发送观察结果
-                observation_data = {
-                    "type": "observation",
-                    "value": str(observation)
-                }
-                yield json.dumps(observation_data, ensure_ascii=False)
+                # 发送推理步骤
+                yield json.dumps({
+                    "type": "step",
+                    "thought": thought,
+                    "action": tool_name,
+                    "action_input": tool_input,
+                    "observation": str(observation)
+                }, ensure_ascii=False)
+                await asyncio.sleep(0.1)
+
+                # 发送工具结束信号
+                yield json.dumps({
+                    "type": "tool_end",
+                    "output": str(observation)
+                }, ensure_ascii=False)
                 await asyncio.sleep(0.1)
 
             # 发送思考结束的信号

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey, Float, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -11,8 +11,25 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=True)  # 用户邮箱
     hashed_password = Column(String)
     is_admin = Column(Boolean, default=False)
+    
+    # API使用情况统计
+    api_calls_count = Column(Integer, default=0)  # 总API调用次数
+    api_calls_today = Column(Integer, default=0)  # 今日API调用次数
+    last_api_call = Column(DateTime, nullable=True)  # 最后一次API调用时间
+    api_usage_reset_date = Column(DateTime, default=datetime.utcnow)  # API使用重置日期
+    
+    # 用户设置
+    preferred_model = Column(String, default='deepseek-chat')  # 默认模型
+    max_conversations = Column(Integer, default=100)  # 最大对话数量
+    max_messages_per_conversation = Column(Integer, default=1000)  # 每个对话最大消息数
+    
+    # 用户状态
+    is_active = Column(Boolean, default=True)  # 用户是否激活
+    last_login = Column(DateTime, nullable=True)  # 最后登录时间
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -61,5 +78,20 @@ class ConversationVector(Base):
     summary_embedding = Column(Text, nullable=True)  # 对话摘要的向量
     key_entities = Column(Text, nullable=True)  # JSON格式的关键实体
     topics = Column(Text, nullable=True)  # JSON格式的话题标签
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class HumanFeedback(Base):
+    __tablename__ = "human_feedbacks"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    feedback_id = Column(String, unique=True, index=True)
+    request_type = Column(String)  # 请求类型
+    task_description = Column(Text)  # 任务描述
+    risk_assessment = Column(Text)  # 风险评估
+    questions = Column(Text)  # JSON格式的问题列表
+    status = Column(String, default="pending")  # pending, approved, rejected, timeout
+    expert_name = Column(String, nullable=True)  # 专家姓名
+    expert_message = Column(Text, nullable=True)  # 专家反馈消息
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) 

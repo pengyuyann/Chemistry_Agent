@@ -27,7 +27,8 @@ from app.core.memory.vector_store import vector_store
 from app.core.db.database import get_db
 from app.core.db.crud import (
     create_conversation, get_user_conversations, get_conversation_by_id,
-    update_conversation_title, delete_conversation, add_message, get_conversation_messages
+    update_conversation_title, delete_conversation, add_message, get_conversation_messages,
+    increment_api_calls
 )
 from app.core.db.models import User
 from app.core.security import get_current_user
@@ -208,6 +209,8 @@ async def chemagent_stream_chat(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # 记录API调用
+    increment_api_calls(db, current_user.id)
     conv_id = request.conversation_id or str(uuid.uuid4())
     
     # 创建或获取对话

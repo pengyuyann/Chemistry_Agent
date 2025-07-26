@@ -174,14 +174,27 @@ def main():
     
     # 启动服务器
     try:
-        uvicorn.run(
-            app,
-            host=host,
-            port=port,
-            reload=reload,
-            log_level=log_level,
-            access_log=True
-        )
+        if reload:
+            # 当启用reload时，使用应用导入字符串
+            uvicorn.run(
+                "run_server:create_app",
+                host=host,
+                port=port,
+                reload=reload,
+                log_level=log_level,
+                access_log=True,
+                factory=True
+            )
+        else:
+            # 当禁用reload时，直接传递应用实例
+            uvicorn.run(
+                app,
+                host=host,
+                port=port,
+                reload=reload,
+                log_level=log_level,
+                access_log=True
+            )
     except KeyboardInterrupt:
         print("\n🛑 服务已停止")
     except Exception as e:
@@ -189,4 +202,4 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    main() 
+    main()

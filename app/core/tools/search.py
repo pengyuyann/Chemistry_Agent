@@ -12,10 +12,10 @@ import langchain
 import molbloom
 import paperqa
 import paperscraper
-from langchain import SerpAPIWrapper
+from langchain_community.utilities import SerpAPIWrapper
 from langchain.base_language import BaseLanguageModel
 from langchain.tools import BaseTool
-from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain_community.embeddings import OpenAIEmbeddings
 from pypdf.errors import PdfReadError
 
 from ..utils import is_multiple_smiles, split_smiles
@@ -197,8 +197,8 @@ def scholar2result_llm(llm, query, k=5, max_sources=2, openai_api_key=None, sema
 
 
 class Scholar2ResultLLM(BaseTool):
-    name = "LiteratureSearch"
-    description = (
+    name: str = "LiteratureSearch"
+    description: str = (
         "Useful to answer questions that require technical "
         "knowledge. Ask a specific question."
     )
@@ -237,17 +237,95 @@ class Scholar2ResultLLM(BaseTool):
 
 def web_search(keywords, search_engine="google"):
     try:
-        return SerpAPIWrapper(
-            serpapi_api_key=os.getenv("SERP_API_KEY"), search_engine=search_engine
-        ).run(keywords)
-    except:
-        return "No results, try another search"
+        # 检查API密钥
+        serp_api_key = os.getenv("SERP_API_KEY")
+        if not serp_api_key:
+            return "SERP_API_KEY not found. Please set the environment variable."
+        
+        # 设置代理
+        proxies = {
+            'http': os.environ.get('http_proxy'),
+            'https': os.environ.get('https_proxy')
+        }
+        
+        # 创建SerpAPIWrapper实例
+        serp_wrapper = SerpAPIWrapper(
+            serpapi_api_key=serp_api_key, 
+            search_engine=search_engine
+        )
+        
+        # 如果设置了代理，尝试配置SerpAPI使用代理
+        if proxies.get('http') or proxies.get('https'):
+            try:
+                # 设置requests的代理（如果SerpAPI内部使用requests）
+                import requests
+                session = requests.Session()
+                session.proxies.update(proxies)
+                # 注意：SerpAPI可能不支持直接设置代理，这里只是尝试
+            except Exception as e:
+                print(f"Warning: Could not set proxy for SerpAPI: {e}")
+        
+        # 执行搜索
+        result = serp_wrapper.run(keywords)
+        
+        # 检查结果
+        if not result or result.strip() == "":
+            return "No results found for the search query."
+        
+        return result
+        
+    except Exception as e:
+        error_msg = str(e)
+        if "API key" in error_msg.lower():
+            return "Invalid or missing SERP_API_KEY. Please check your API key."
+        elif "quota" in error_msg.lower() or "limit" in error_msg.lower():
+            return "SerpAPI quota exceeded or rate limit reached."
+        elif "network" in error_msg.lower() or "connection" in error_msg.lower():
+            return "Network connection error. Please check your internet connection and proxy settings."
+        else:
+            return f"Search failed: {error_msg}"
+
+
+def wikipedia_search(query):
+    """维基百科搜索功能"""
+    try:
+        from langchain_community.utilities import WikipediaAPIWrapper
+        import wikipedia
+        import requests
+        
+        # 设置代理
+        proxies = {
+            'http': os.environ.get('http_proxy'),
+            'https': os.environ.get('https_proxy')
+        }
+        
+        # 创建维基百科API包装器
+        wiki_wrapper = WikipediaAPIWrapper()
+        
+        # 设置wikipedia库的代理
+        if proxies.get('http') or proxies.get('https'):
+            # 直接设置环境变量，让wikipedia库使用代理
+            original_http_proxy = os.environ.get('http_proxy')
+            original_https_proxy = os.environ.get('https_proxy')
+            
+            # 确保环境变量已设置
+            if not original_http_proxy:
+                os.environ['http_proxy'] = proxies['http']
+            if not original_https_proxy:
+                os.environ['https_proxy'] = proxies['https']
+        
+        # 执行搜索
+        result = wiki_wrapper.run(query)
+        return result
+    except Exception as e:
+        return f"维基百科搜索失败: {str(e)}"
 
 
 class WebSearch(BaseTool):
-    name = "WebSearch"
-    description = (
-        "Input a specific question, returns an answer from web search. "
+    name: str = "WebSearch"
+    description: str = (
+        "Input a specific question, returns an answer from web search or Wikipedia. "
+        "For general knowledge questions, Wikipedia will be used. For specific or recent information, web search will be used. "
         "Do not mention any specific molecule names, but use more general features to formulate your questions."
     )
     serp_api_key: str = None
@@ -257,11 +335,33 @@ class WebSearch(BaseTool):
         self.serp_api_key = serp_api_key
 
     def _run(self, query: str) -> str:
+        # 判断是否适合使用维基百科
+        wikipedia_keywords = [
+            'what is', 'who is', 'definition', 'history', 'background', 
+            'introduction', 'overview', 'concept', 'theory', 'method',
+            'process', 'technique', 'principle', 'basics', 'fundamentals'
+        ]
+        
+        query_lower = query.lower()
+        use_wikipedia = any(keyword in query_lower for keyword in wikipedia_keywords)
+        
+        if use_wikipedia:
+            # 使用维基百科搜索
+            result = wikipedia_search(query)
+            if "维基百科搜索失败" not in result:
+                return f"[维基百科搜索结果]\n{result}"
+        
+        # 如果维基百科不适合或失败，使用普通网络搜索
         if not self.serp_api_key:
             return (
                 "No SerpAPI key found. This tool may not be used without a SerpAPI key."
             )
-        return web_search(query)
+        
+        web_result = web_search(query)
+        if use_wikipedia:
+            return f"{result}\n\n[网络搜索结果]\n{web_result}"
+        else:
+            return web_result
 
     async def _arun(self, query: str) -> str:
         """Use the tool asynchronously."""
@@ -269,8 +369,8 @@ class WebSearch(BaseTool):
 
 
 class PatentCheck(BaseTool):
-    name = "PatentCheck"
-    description = "Input SMILES, returns if molecule is patented. You may also input several SMILES, separated by a period."
+    name: str = "PatentCheck"
+    description: str = "Input SMILES, returns if molecule is patented. You may also input several SMILES, separated by a period."
 
     def _run(self, smiles: str) -> str:
         """Checks if compound is patented. Give this tool only one SMILES string"""

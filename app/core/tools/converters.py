@@ -19,11 +19,11 @@ from ..utils import (
 
 
 class Query2CAS(BaseTool):
-    name = "Mol2CAS"
-    description = "Input molecule (name or SMILES), returns CAS number."
+    name: str = "Mol2CAS"
+    description: str = "Input molecule (name or SMILES), returns CAS number."
     url_cid: str = None
     url_data: str = None
-    ControlChemCheck = ControlChemCheck()
+    control_chem_check: ControlChemCheck = ControlChemCheck()
 
     def __init__(
         self,
@@ -52,7 +52,7 @@ class Query2CAS(BaseTool):
                 except ValueError as e:
                     return str(e)
             # check if mol is controlled
-            msg = self.ControlChemCheck._run(smiles)
+            msg = self.control_chem_check._run(smiles)
             if "high similarity" in msg or "appears" in msg:
                 return f"CAS number {cas}found, but " + msg
             return cas
@@ -64,11 +64,11 @@ class Query2CAS(BaseTool):
         return self._run(query)
 
 class Query2SMILES(BaseTool):
-    name = "Name2SMILES"
-    description = "Input a molecule name, returns SMILES."
+    name: str = "Name2SMILES"
+    description: str = "Input a molecule name, returns SMILES."
     url: str = None
     chemspace_api_key: str = None
-    ControlChemCheck = ControlChemCheck()
+    control_chem_check: ControlChemCheck = ControlChemCheck()
 
     def __init__(self, chemspace_api_key: str = None):
         super().__init__()
@@ -92,7 +92,7 @@ class Query2SMILES(BaseTool):
             else:
                 return str(e)
 
-        msg = "Note: " + self.ControlChemCheck._run(smi)
+        msg = "Note: " + self.control_chem_check._run(smi)
         if "high similarity" in msg or "appears" in msg:
             return f"CAS number {smi}found, but " + msg
         return smi
@@ -101,10 +101,10 @@ class Query2SMILES(BaseTool):
         return self._run(query)
 
 class SMILES2Name(BaseTool):
-    name = "SMILES2Name"
-    description = "Input SMILES, returns molecule name."
-    ControlChemCheck = ControlChemCheck()
-    query2smiles = Query2SMILES()
+    name: str = "SMILES2Name"
+    description: str = "Input SMILES, returns molecule name."
+    control_chem_check: ControlChemCheck = ControlChemCheck()
+    query2smiles: Query2SMILES = Query2SMILES()
 
     def __init__(self):
         super().__init__()
@@ -119,7 +119,7 @@ class SMILES2Name(BaseTool):
                     raise ValueError("Invalid molecule input, no Pubchem entry")
             name = smiles2name(query)
             # check if mol is controlled
-            msg = "Note: " + self.ControlChemCheck._run(query)
+            msg = "Note: " + self.control_chem_check._run(query)
             if "high similarity" in msg or "appears" in msg:
                 return f"Molecule name {name} found, but " + msg
             return name

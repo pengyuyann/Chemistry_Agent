@@ -230,8 +230,8 @@ class ChemSpace:
 
 
 class GetMoleculePrice(BaseTool):
-    name = "GetMoleculePrice"
-    description = "Get the cheapest available price of a molecule."
+    name: str = "GetMoleculePrice"
+    description: str = "Get the cheapest available price of a molecule."
     chemspace_api_key: str = None
     url: str = None
 

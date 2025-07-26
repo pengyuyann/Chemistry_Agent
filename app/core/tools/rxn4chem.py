@@ -14,8 +14,8 @@ from time import sleep
 from typing import Optional
 
 from langchain.chat_models import ChatOpenAI
-from langchain.schema import HumanMessage
-from langchain.tools import BaseTool
+from langchain_core.messages import HumanMessage
+from langchain_core.tools import BaseTool
 from rxn4chemistry import RXN4ChemistryWrapper  # type: ignore
 
 from ..utils import is_smiles
@@ -89,8 +89,8 @@ class RXN4Chem(BaseTool):
 class RXNPredict(RXN4Chem):
     """Predict reaction."""
 
-    name = "ReactionPredict"
-    description = (
+    name: str = "ReactionPredict"
+    description: str = (
         "Predict the outcome of a chemical reaction. "
         "Takes as input the SMILES of the reactants separated by a dot '.', "
         "returns SMILES of the products."
@@ -133,8 +133,8 @@ class RXNPredict(RXN4Chem):
 class RXNRetrosynthesis(RXN4Chem):
     """Predict retrosynthesis."""
 
-    name = "ReactionRetrosynthesis"
-    description = (
+    name: str = "ReactionRetrosynthesis"
+    description: str = (
         "Obtain the synthetic route to a chemical compound. "
         "Takes as input the SMILES of the product, returns recipe."
     )

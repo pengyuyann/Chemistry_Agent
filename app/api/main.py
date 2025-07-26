@@ -21,9 +21,9 @@ load_dotenv()
 os.environ["http_proxy"] = "http://127.0.0.1:7897"
 os.environ["https_proxy"] = "http://127.0.0.1:7897"
 
-# 导入路由
-from app.api.endpoints import chemagent_chat
-from app.api.endpoints import auth, admin
+# 导入路由 - 修复导入路径，因为start_server.py会切换到app目录
+from api.endpoints import chemagent_chat
+from api.endpoints import auth, admin
 
 # 创建FastAPI应用
 app = FastAPI(

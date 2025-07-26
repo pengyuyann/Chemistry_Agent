@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getMe, login as apiLogin, register as apiRegister } from '../api/auth';
+import { getCurrentUser, login as apiLogin, register as apiRegister } from '../api/auth';
 import { getToken, setToken, removeToken } from '../utils/token';
 
 interface User {
@@ -26,7 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const token = getToken();
     if (token) {
-      getMe().then(u => {
+      getCurrentUser().then(u => {
         setUser(u);
         setLoading(false);
       }).catch(() => {
@@ -41,7 +41,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (username: string, password: string) => {
     const { access_token } = await apiLogin(username, password);
     setToken(access_token);
-    const u = await getMe();
+    const u = await getCurrentUser();
     setUser(u);
   };
 

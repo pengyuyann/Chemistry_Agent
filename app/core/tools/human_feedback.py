@@ -19,8 +19,8 @@ from app.core.db.database import SessionLocal
 class HumanFeedbackTool(BaseTool):
     """人类专家反馈工具 - 用于高风险任务的人工确认"""
     
-    name = "HumanFeedback"
-    description = (
+    name: str = "HumanFeedback"
+    description: str = (
         "当LLM无法确定或遇到高风险任务时，调用此工具请求人工反馈。"
         "适用于：管制化学品合成、爆炸性物质处理、高风险实验等场景。"
         "输入格式：JSON字符串，包含任务描述、风险评估、需要确认的问题等。"

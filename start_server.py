@@ -113,26 +113,8 @@ def main():
     # 检查环境
     check_environment()
 
-    print("\n📋 启动选项:")
-    print("1. 启动API服务器")
-    print("2. 运行测试")
-    print("3. 退出")
+    start_server()
 
-    while True:
-        choice = input("\n请选择 (1-3): ").strip()
-
-        if choice == "1":
-            start_server()
-            break
-        elif choice == "2":
-            print("🧪 运行测试...")
-            subprocess.run([sys.executable, "test_chemagent.py"])
-            break
-        elif choice == "3":
-            print("👋 再见!")
-            break
-        else:
-            print("❌ 无效选择，请重新输入")
 
 
 if __name__ == "__main__":

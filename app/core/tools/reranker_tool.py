@@ -17,8 +17,8 @@ import json
 class RerankerSearchTool(BaseTool):
     """重排序搜索工具，用于在对话过程中搜索相关历史对话"""
     
-    name = "RerankerSearch"
-    description = """
+    name: str = "RerankerSearch"
+    description: str = """
     搜索用户的历史对话记录，找到与当前问题最相关的历史对话。
     这个工具使用先进的重排序技术，能够更准确地找到相关的历史对话。
     
@@ -90,8 +90,8 @@ class RerankerSearchTool(BaseTool):
 class ContextEnhancementTool(BaseTool):
     """上下文增强工具，用于增强当前对话的上下文"""
     
-    name = "ContextEnhancement"
-    description = """
+    name: str = "ContextEnhancement"
+    description: str = """
     基于当前对话内容，搜索并整合相关的历史对话信息，增强对话的上下文理解。
     这个工具可以帮助提供更连贯和个性化的回答。
     
