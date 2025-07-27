@@ -61,6 +61,9 @@ class Message(Base):
     model_used = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
+    # 新增：思考步骤字段
+    steps = Column(JSON, nullable=True)  # 存储思考步骤的JSON数据
+    
     # 向量存储相关字段
     embedding = Column(Text, nullable=True)  # 存储JSON格式的向量
     embedding_model = Column(String, nullable=True)  # 使用的嵌入模型
@@ -94,4 +97,4 @@ class HumanFeedback(Base):
     expert_name = Column(String, nullable=True)  # 专家姓名
     expert_message = Column(Text, nullable=True)  # 专家反馈消息
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) 
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

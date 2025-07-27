@@ -251,7 +251,7 @@ const ChatGPTStyleInterface: React.FC<ChatGPTStyleInterfaceProps> = ({
         </div>
         {steps.map((step, idx) => (
           <div key={idx} style={{ 
-            marginBottom: idx < steps.length - 1 ? 16 : 0,
+            marginBottom: idx < (steps?.length || 0) - 1 ? 16 : 0,
             padding: 16,
             background: '#ffffff',
             borderRadius: 10,
@@ -294,13 +294,17 @@ const ChatGPTStyleInterface: React.FC<ChatGPTStyleInterfaceProps> = ({
                   }}>思考</strong>
                 </div>
                 <div style={{ 
-                  marginLeft: 24, 
-                  fontSize: 14,
-                  lineHeight: 1.6,
-                  color: '#475569'
-                }}>
-                  {step.thought}
-                </div>
+                marginLeft: 24, 
+                fontSize: 14,
+                lineHeight: 1.6,
+                color: '#475569'
+              }}>
+                <EnhancedContentParser 
+                  content={step.thought || '无思考内容'}
+                  enableMarkdown={true}
+                  enableChemicalDetection={true}
+                />
+              </div>
               </div>
 
               {/* 行动和输入 */}
@@ -325,17 +329,17 @@ const ChatGPTStyleInterface: React.FC<ChatGPTStyleInterfaceProps> = ({
                     }}>行动</strong>
                   </div>
                   <div style={{ 
-                    marginLeft: 22, 
-                    fontSize: 13,
-                    color: '#64748b',
-                    fontFamily: 'Monaco, Consolas, monospace',
-                    background: '#f8fafc',
-                    padding: '6px 10px',
-                    borderRadius: 6,
-                    border: '1px solid #e2e8f0'
-                  }}>
-                    {step.action}
-                  </div>
+                  marginLeft: 22, 
+                  fontSize: 13,
+                  color: '#64748b',
+                  fontFamily: 'Monaco, Consolas, monospace',
+                  background: '#f8fafc',
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  border: '1px solid #e2e8f0'
+                }}>
+                  {step.action || '无行动'}
+                </div>
                 </div>
                 
                 <div>
@@ -353,18 +357,18 @@ const ChatGPTStyleInterface: React.FC<ChatGPTStyleInterfaceProps> = ({
                     }}>输入</strong>
                   </div>
                   <div style={{ 
-                    marginLeft: 22, 
-                    fontSize: 13,
-                    color: '#64748b',
-                    fontFamily: 'Monaco, Consolas, monospace',
-                    background: '#f8fafc',
-                    padding: '6px 10px',
-                    borderRadius: 6,
-                    border: '1px solid #e2e8f0',
-                    wordBreak: 'break-all'
-                  }}>
-                    {step.action_input}
-                  </div>
+                  marginLeft: 22, 
+                  fontSize: 13,
+                  color: '#64748b',
+                  fontFamily: 'Monaco, Consolas, monospace',
+                  background: '#f8fafc',
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  border: '1px solid #e2e8f0',
+                  wordBreak: 'break-all'
+                }}>
+                  {step.action_input || '无输入'}
+                </div>
                 </div>
               </div>
 
@@ -384,51 +388,21 @@ const ChatGPTStyleInterface: React.FC<ChatGPTStyleInterfaceProps> = ({
                   }}>观察结果</strong>
                 </div>
                 <div style={{ 
-                  marginLeft: 24, 
-                  fontSize: 14,
-                  lineHeight: 1.6,
-                  color: '#475569',
-                  background: '#fafbfc',
-                  padding: 12,
-                  borderRadius: 8,
-                  border: '1px solid #e2e8f0'
-                }}>
-                  <ReactMarkdown 
-                     remarkPlugins={[remarkGfm]}
-                     components={{
-                       p: ({ children }) => <div style={{ margin: '8px 0' }}>{children}</div>,
-                       code: ({ children, className }) => {
-                         const isInline = !className;
-                         return isInline ? (
-                           <code style={{
-                             background: '#f1f5f9',
-                             padding: '2px 6px',
-                             borderRadius: 4,
-                             fontSize: 13,
-                             fontFamily: 'Monaco, Consolas, monospace',
-                             color: '#e11d48'
-                           }}>
-                             {children}
-                           </code>
-                         ) : (
-                           <pre style={{
-                             background: '#1e293b',
-                             color: '#e2e8f0',
-                             padding: 12,
-                             borderRadius: 6,
-                             overflow: 'auto',
-                             fontSize: 13,
-                             fontFamily: 'Monaco, Consolas, monospace'
-                           }}>
-                             <code>{children}</code>
-                           </pre>
-                         );
-                       }
-                     }}
-                   >
-                     {step.observation}
-                   </ReactMarkdown>
-                </div>
+                marginLeft: 24, 
+                fontSize: 14,
+                lineHeight: 1.6,
+                color: '#475569',
+                background: '#fafbfc',
+                padding: 12,
+                borderRadius: 8,
+                border: '1px solid #e2e8f0'
+              }}>
+                <EnhancedContentParser 
+                  content={step.observation || '无观察结果'}
+                  enableMarkdown={true}
+                  enableChemicalDetection={true}
+                />
+              </div>
               </div>
             </div>
           </div>
@@ -529,7 +503,7 @@ const ChatGPTStyleInterface: React.FC<ChatGPTStyleInterfaceProps> = ({
                 }}>
                   <Spin />
                 </div>
-              ) : conversations.length === 0 ? (
+              ) : (conversations || []).length === 0 ? (
                 <div style={{
                   textAlign: 'center',
                   color: '#94a3b8',
@@ -767,7 +741,7 @@ const ChatGPTStyleInterface: React.FC<ChatGPTStyleInterfaceProps> = ({
                   fontWeight: 500
                 }}
               >
-                {availableModels.map(model => (
+                {(availableModels || []).map(model => (
                   <option key={model.id} value={model.id}>
                     {model.name}
                   </option>
@@ -784,7 +758,7 @@ const ChatGPTStyleInterface: React.FC<ChatGPTStyleInterfaceProps> = ({
           padding: '24px',
           background: '#f8fafc'
         }}>
-          {messages.length === 0 && (
+          {(messages || []).length === 0 && (
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -896,8 +870,8 @@ const ChatGPTStyleInterface: React.FC<ChatGPTStyleInterfaceProps> = ({
                               }}>
                                 <EnhancedContentParser 
                                   content={msg.thinking} 
-                                  enableMarkdown={false}
-                                  enableChemicalDetection={false}
+                                  enableMarkdown={true}
+                                  enableChemicalDetection={true}
                                 />
                               </div>
                             </div>
@@ -1107,7 +1081,7 @@ const ChatGPTStyleInterface: React.FC<ChatGPTStyleInterfaceProps> = ({
                 发送
               </Button>
               
-              {messages.length > 0 && (
+              {(messages || []).length > 0 && (
                 <Button
                   onClick={clearChat}
                   size="large"
@@ -1126,6 +1100,7 @@ const ChatGPTStyleInterface: React.FC<ChatGPTStyleInterfaceProps> = ({
                   清空
                 </Button>
               )}
+
             </div>
           </div>
         </div>

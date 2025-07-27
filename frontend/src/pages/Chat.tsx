@@ -255,32 +255,33 @@ const ChatInterface: React.FC = () => {
     setLoadingConversations(true);
     try {
       const data = await getConversations();
-      setConversations(data.conversations);
       
-      // 如果有对话历史，自动加载最近的对话
-      if (data.conversations.length > 0 && !currentConversationId) {
-        const mostRecentConversation = data.conversations[0];
-        await loadConversation(mostRecentConversation.id);
+      // 后端直接返回数组，不是包含conversations字段的对象
+      if (Array.isArray(data)) {
+        setConversations(data);
+        
+        // 如果有对话历史，自动加载最近的对话
+        if (data.length > 0 && !currentConversationId) {
+          const mostRecentConversation = data[0];
+          await loadConversation(mostRecentConversation.id);
+        }
+      } else {
+        // 如果返回的数据格式不正确，设置为空数组
+        console.warn('Invalid conversations data format:', data);
+        setConversations([]);
       }
-    } catch (error) {
-      antdMessage.error('加载对话历史失败');
+    } catch (error: any) {
       console.error('加载对话历史错误:', error);
+      setConversations([]); // 设置为空数组避免后续错误
+      
+      // 如果是401错误，可能是认证问题
+      if (error?.response?.status === 401) {
+        antdMessage.error('认证失败，请重新登录');
+      } else {
+        antdMessage.error('加载对话历史失败');
+      }
     } finally {
       setLoadingConversations(false);
-    }
-  };
-
-  // 加载可用模型
-  const loadAvailableModels = async () => {
-    setLoadingModels(true);
-    try {
-      const data = await getAvailableModels();
-      setAvailableModels(data.models);
-    } catch (error) {
-      antdMessage.error('加载模型列表失败');
-      console.error('加载模型列表错误:', error);
-    } finally {
-      setLoadingModels(false);
     }
   };
 
@@ -288,23 +289,44 @@ const ChatInterface: React.FC = () => {
   const loadConversation = async (conversationId: string) => {
     try {
       const data = await getConversation(conversationId);
+      console.log('从后端获取的原始数据:', data); // 调试日志
       setCurrentConversationId(conversationId);
-      setSelectedModel(data.model_used);
       
-      // 转换消息格式
-      const convertedMessages: Message[] = data.messages.map((msg: any, index: number) => ({
-        id: index.toString(),
-        type: msg.role as 'user' | 'assistant',
-        content: msg.content,
-        timestamp: new Date(msg.created_at),
-        model: msg.model_used,
-        // 对于助手消息，将content设置为finalAnswer
-        ...(msg.role === 'assistant' && { finalAnswer: msg.content }),
-      }));
-      
-      setMessages(convertedMessages);
-    } catch (error) {
+      // 检查data.messages是否存在
+      if (data.messages && Array.isArray(data.messages)) {
+        // 如果有消息，设置模型
+        if (data.messages.length > 0) {
+          const firstMessage = data.messages.find((msg: any) => msg.model_used);
+          if (firstMessage) {
+            setSelectedModel(firstMessage.model_used);
+          }
+        }
+        
+        // 转换消息格式
+        const convertedMessages: Message[] = data.messages.map((msg: any, index: number) => {
+          console.log(`消息 ${index} 的 steps:`, msg.steps); // 调试每条消息的steps
+          return {
+            id: index.toString(),
+            type: msg.role as 'user' | 'assistant',
+            content: msg.content,
+            timestamp: new Date(msg.created_at),
+            model: msg.model_used,
+            // 处理思考步骤
+            reasoningSteps: Array.isArray(msg.steps) ? msg.steps : [],
+            // 对于助手消息，将content设置为finalAnswer
+            ...(msg.role === 'assistant' && { finalAnswer: msg.content }),
+          };
+        });
+        
+        console.log('转换后的消息:', convertedMessages); // 调试转换后的数据
+        setMessages(convertedMessages);
+      } else {
+        setMessages([]);
+      }
+    } catch (error: any) {
+      console.error('加载对话失败:', error);
       antdMessage.error('加载对话失败');
+      setMessages([]);
     }
   };
 
@@ -312,7 +334,22 @@ const ChatInterface: React.FC = () => {
   const createNewConversation = () => {
     setCurrentConversationId(null);
     setMessages([]);
-    setInputValue('');
+    antdMessage.info('已创建新对话');
+  };
+
+  // 加载可用模型
+  const loadAvailableModels = async () => {
+    setLoadingModels(true);
+    try {
+      const data = await getAvailableModels();
+      setAvailableModels(data.models || []);
+    } catch (error: any) {
+      antdMessage.error('加载模型列表失败');
+      console.error('加载模型列表错误:', error);
+      setAvailableModels([]); // 设置默认值
+    } finally {
+      setLoadingModels(false);
+    }
   };
 
   // 更新对话标题
@@ -326,7 +363,8 @@ const ChatInterface: React.FC = () => {
       setEditingConversation(null);
       loadConversations(); // 重新加载对话列表
       antdMessage.success('标题更新成功');
-    } catch (error) {
+    } catch (error: any) {
+      console.error('更新标题失败:', error);
       antdMessage.error('更新标题失败');
     }
   };
@@ -334,44 +372,33 @@ const ChatInterface: React.FC = () => {
   // 删除对话
   const handleDeleteConversation = async (conversationId: string) => {
     // 防止重复删除
-    if (deletingConversations.has(conversationId)) {
-      return;
-    }
+    if (deletingConversations.has(conversationId)) return;
     
-    const conversation = conversations.find(c => c.id === conversationId);
-    if (!conversation) return;
+    // 修复Set展开语法问题 - 使用Array.from
+    setDeletingConversations(prev => new Set([...Array.from(prev), conversationId]));
     
-    Modal.confirm({
-      title: '确认删除',
-      content: `确定要删除对话"${conversation.title}"吗？此操作不可恢复。`,
-      okText: '删除',
-      okType: 'danger',
-      cancelText: '取消',
-      onOk: async () => {
-        // 标记正在删除
-        setDeletingConversations(prev => new Set(prev).add(conversationId));
-        
-        try {
-          await deleteConversation(conversationId);
-          if (currentConversationId === conversationId) {
-            createNewConversation();
-          }
-          // 从本地状态中移除已删除的对话
-          setConversations(prev => prev.filter(c => c.id !== conversationId));
-          antdMessage.success('对话删除成功');
-        } catch (error) {
-          antdMessage.error('删除对话失败');
-          console.error('删除对话错误:', error);
-        } finally {
-          // 移除删除标记
-          setDeletingConversations(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(conversationId);
-            return newSet;
-          });
-        }
+    try {
+      await deleteConversation(conversationId);
+      
+      // 如果删除的是当前对话，清空消息
+      if (currentConversationId === conversationId) {
+        setCurrentConversationId(null);
+        setMessages([]);
       }
-    });
+      
+      // 重新加载对话列表
+      loadConversations();
+      antdMessage.success('对话删除成功');
+    } catch (error: any) {
+      console.error('删除对话失败:', error);
+      antdMessage.error('删除对话失败');
+    } finally {
+      setDeletingConversations(prev => {
+        const newSet = new Set(Array.from(prev));
+        newSet.delete(conversationId);
+        return newSet;
+      });
+    }
   };
 
   return (

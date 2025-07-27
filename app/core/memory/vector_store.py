@@ -1,17 +1,19 @@
-import json
 import numpy as np
+import json
 from typing import List, Dict, Optional, Tuple
 from sqlalchemy.orm import Session
 from app.core.db.models import Message, ConversationVector
 import uuid
 from .reranker import Reranker, RerankResult
+from .embedding import EmbeddingModel
+from app.configs.embedding_config import EmbeddingConfig
 
 class VectorStore:
     """向量数据库管理器"""
     
-    def __init__(self, embedding_model: str = "text-embedding-ada-002", use_reranker: bool = True):
-        self.embedding_model = embedding_model
-        self.embeddings_cache = {}  # 简单的内存缓存
+    def __init__(self, embedding_config: Optional[EmbeddingConfig] = None, use_reranker: bool = True):
+        # 初始化embedding模型
+        self.embedding_model = EmbeddingModel(embedding_config)
         self.use_reranker = use_reranker
         
         # 初始化重排序器
@@ -20,26 +22,36 @@ class VectorStore:
     
     def get_embedding(self, text: str) -> List[float]:
         """获取文本的向量表示"""
-        # 这里应该调用实际的嵌入模型API
-        # 暂时使用简单的哈希作为向量（实际应用中需要替换为真实的嵌入模型）
+        try:
+            embedding = self.embedding_model.encode(text)
+            return embedding if isinstance(embedding, list) else embedding.tolist()
+        except Exception as e:
+            print(f"Embedding generation failed: {e}")
+            # 回退到哈希方法
+            return self._fallback_hash_embedding(text)
+    
+    def _fallback_hash_embedding(self, text: str) -> List[float]:
+        """回退的哈希embedding方法"""
         import hashlib
         hash_obj = hashlib.md5(text.encode())
         hash_hex = hash_obj.hexdigest()
         
-        # 将哈希转换为向量（1536维，模拟OpenAI的嵌入维度）
+        # 将哈希转换为向量
         vector = []
+        target_dim = self.embedding_model.get_embedding_dim()
+        
         for i in range(0, len(hash_hex), 2):
-            if len(vector) >= 1536:
+            if len(vector) >= target_dim:
                 break
             hex_pair = hash_hex[i:i+2]
             vector.append(int(hex_pair, 16) / 255.0)
         
         # 如果向量长度不够，用0填充
-        while len(vector) < 1536:
+        while len(vector) < target_dim:
             vector.append(0.0)
         
-        return vector[:1536]
-    
+        return vector[:target_dim]
+
     def store_message_embedding(self, db: Session, message_id: int, content: str) -> str:
         """存储消息的向量表示"""
         embedding = self.get_embedding(content)
@@ -49,12 +61,9 @@ class VectorStore:
         message = db.query(Message).filter(Message.id == message_id).first()
         if message:
             message.embedding = json.dumps(embedding)
-            message.embedding_model = self.embedding_model
+            message.embedding_model = self.embedding_model.config.model_name
             message.vector_id = vector_id
             db.commit()
-        
-        # 缓存向量
-        self.embeddings_cache[vector_id] = embedding
         
         return vector_id
     
@@ -85,9 +94,6 @@ class VectorStore:
         
         db.commit()
         
-        # 缓存向量
-        self.embeddings_cache[vector_id] = summary_embedding
-        
         return vector_id
     
     def similarity_search(self, query: str, conversation_vectors: List[ConversationVector], 
@@ -99,26 +105,12 @@ class VectorStore:
         for conv_vector in conversation_vectors:
             if conv_vector.summary_embedding:
                 summary_embedding = json.loads(conv_vector.summary_embedding)
-                similarity = self.cosine_similarity(query_embedding, summary_embedding)
+                similarity = self.embedding_model.similarity(query_embedding, summary_embedding)
                 results.append((conv_vector, similarity))
         
         # 按相似度排序
         results.sort(key=lambda x: x[1], reverse=True)
         return results[:top_k]
-    
-    def cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
-        """计算余弦相似度"""
-        vec1 = np.array(vec1)
-        vec2 = np.array(vec2)
-        
-        dot_product = np.dot(vec1, vec2)
-        norm1 = np.linalg.norm(vec1)
-        norm2 = np.linalg.norm(vec2)
-        
-        if norm1 == 0 or norm2 == 0:
-            return 0.0
-        
-        return dot_product / (norm1 * norm2)
     
     def get_relevant_context(self, db: Session, user_id: int, current_query: str, 
                            conversation_id: str, top_k: int = 3, 
@@ -196,6 +188,14 @@ class VectorStore:
         for message in messages:
             if not message.embedding:
                 self.store_message_embedding(db, message.id, message.content)
+    
+    def get_model_info(self) -> Dict:
+        """获取模型信息"""
+        return self.embedding_model.get_model_info()
+    
+    def batch_encode(self, texts: List[str]) -> List[List[float]]:
+        """批量编码文本"""
+        return self.embedding_model.encode(texts)
 
 # 全局向量存储实例
-vector_store = VectorStore() 
+vector_store = VectorStore()

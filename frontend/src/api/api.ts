@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getToken } from '../utils/token';
+import { getToken, removeToken } from '../utils/token';
 
 // 创建axios实例
 export const api = axios.create({
@@ -31,13 +31,16 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      // Token过期或无效，清除本地存储并重定向到登录页
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Token过期或无效，清除本地存储
+      removeToken();
+      
+      // 只有在不是登录页面时才跳转
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
 );
 
-export default api; 
+export default api;

@@ -95,6 +95,39 @@ def _make_llm(model, temp, api_key, streaming: bool = False, callbacks=None):
         # 捕获所有可能的异常，包括ValidationError和其他配置错误
         raise ValueError(f"Failed to create LLM instance for model {model}: {str(e)}")
 
+# 全局缓存 ChemAgent 实例
+_chemagent_instance_cache = {}
+_cache_lock = threading.Lock()
+
+def get_chemagent_instance(config: dict):
+    """获取 ChemAgent 实例，支持缓存"""
+    # 使用配置的关键项创建一个可哈希的键
+    cache_key = (
+        config.get("model"),
+        config.get("tools_model"),
+        config.get("temperature"),
+        config.get("user_id"),
+        config.get("conversation_id")
+    )
+
+    with _cache_lock:
+        if cache_key in _chemagent_instance_cache:
+            return _chemagent_instance_cache[cache_key]
+
+        instance = ChemAgent(
+            model=config.get("model", "deepseek-chat"),
+            tools_model=config.get("tools_model", "deepseek-chat"),
+            temp=config.get("temperature", 0.1),
+            max_iterations=config.get("max_iterations", 40),
+            streaming=config.get("streaming", True),
+            api_keys=config.get("api_keys", {}),
+            local_rxn=config.get("local_rxn", False),
+            user_id=config.get("user_id"),
+            conversation_id=config.get("conversation_id")
+        )
+        _chemagent_instance_cache[cache_key] = instance
+        return instance
+
 class ChemAgent:
     def __init__(
         self,
@@ -287,9 +320,7 @@ class ChemAgent:
                 context_enhanced_question = f"基于历史对话：{context_summary}\n\n当前问题：{question}"
 
             # 使用最终答案生成链
-            result = await asyncio.get_event_loop().run_in_executor(
-                None,
-                self.final_answer_chain.run,
+            result = await self.final_answer_chain.arun(
                 {
                     "question": context_enhanced_question,
                     "intermediate_steps": steps_text,

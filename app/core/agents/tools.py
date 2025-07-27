@@ -59,7 +59,7 @@ def make_tools(llm: BaseLanguageModel, api_keys: dict = {}, local_rxn: bool=Fals
     if chemspace_api_key:
         all_tools += [GetMoleculePrice(chemspace_api_key)]
     if serp_api_key:
-        all_tools += [WebSearch(serp_api_key)]
+        all_tools += [WebSearch(serp_api_key=serp_api_key)]
     if (not local_rxn) and rxn4chem_api_key:
         all_tools += [
             RXNPredict(rxn4chem_api_key),

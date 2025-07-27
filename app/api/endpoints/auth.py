@@ -76,24 +76,28 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """用户登录"""
     user = get_user_by_username(db, form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="用户名或密码错误")
-    access_token = create_access_token({"sub": user.username, "user_id": user.id, "is_admin": user.is_admin})
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户名或密码错误",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # 更新最后登录时间
+    update_last_login(db, user.id)
+    
+    access_token = create_access_token({
+        "sub": user.username, 
+        "user_id": user.id, 
+        "is_admin": user.is_admin
+    })
     return {"access_token": access_token, "token_type": "bearer"}
-
-# 获取当前用户
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
-    payload = decode_access_token(token)
-    if not payload:
-        raise HTTPException(status_code=401, detail="无效token")
-    user = get_user_by_username(db, payload.get("sub"))
-    if not user:
-        raise HTTPException(status_code=401, detail="用户不存在")
-    return user
 
 @router.get("/me", response_model=UserOut)
 def get_me(current_user: User = Depends(get_current_user)):
+    """获取当前用户信息"""
     return current_user 
 
 @router.get("/profile")

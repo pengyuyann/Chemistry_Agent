@@ -79,7 +79,7 @@ def delete_conversation(db: Session, conversation_id: str):
         db.commit()
     return conversation
 
-def add_message(db: Session, conversation_id: str, role: str, content: str, model_used: str = None):
+def add_message(db: Session, conversation_id: str, role: str, content: str, model_used: str = None, steps: list = None):
     """添加消息到对话"""
     conversation = get_conversation_by_id(db, conversation_id)
     if not conversation:
@@ -89,7 +89,8 @@ def add_message(db: Session, conversation_id: str, role: str, content: str, mode
         conversation_id=conversation.id,
         role=role,
         content=content,
-        model_used=model_used
+        model_used=model_used,
+        steps=steps
     )
     db.add(message)
     
@@ -213,4 +214,4 @@ def create_user_with_email(db: Session, username: str, email: str, password: str
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user 
+    return user
