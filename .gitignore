@@ -11,7 +11,7 @@ env/
 venv/
 .venv/
 node_modules/
-
+app/models/
 # IDE
 .vscode/
 .idea/
